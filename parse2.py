@@ -29,7 +29,7 @@ def parse_args():
 def load_grammar(gr_file):
     f = open(gr_file)
     gr =[]
-    
+
     i = 0
     for line in f:
         l = (line.strip('\n')).split('\t')
@@ -38,7 +38,7 @@ def load_grammar(gr_file):
 
         if gr[i][lhs_idx] not in NT:
             NT.append(gr[i][lhs_idx])
-        
+
         i += 1
 
     return gr
@@ -61,13 +61,13 @@ def complete(non_term, pos, start, wt, ptr):
         if len(const[rhs_idx]) > const[dot_idx]:
             l = []
             if const[ptr_idx] != None:
-                
+
                 l.append(const[ptr_idx][0])
             l.append(ptr)
 
-            
+
             if (const[rhs_idx][const[dot_idx]] == non_term) and ([const[start_idx], const[lhs_idx], const[rhs_idx], const[dot_idx]+1, const[wt_idx]*wt, l] not in ELY[pos]):
-                
+
                 ELY[pos].append([const[start_idx], const[lhs_idx], const[rhs_idx], const[dot_idx]+1, const[wt_idx]*wt, l])
 
 #               print("complete:", pos, [const[start_idx], const[lhs_idx], const[rhs_idx], const[dot_idx]+1, const[wt_idx]*wt, l])
@@ -104,23 +104,24 @@ def attach(pos, start, lhs, rhs, dot, wt, ptr):
 def parse(gr, sen):
 
     global parse_found
-    
+
     for r in gr:
+        
         if r[lhs_idx] == 'ROOT':
-            ELY[0] = [[0, 'ROOT', r[rhs_idx], 0, int(r[prob_idx]), None]]
+            ELY[0] = [[0, 'ROOT', r[rhs_idx], 0, float(r[prob_idx]), None]]
     if not ELY[0]:
         return 0
 
     n = len(sen)
 
     for pos in range(n+1):
-        
+
         for const in ELY[pos]:
 
             if len(const[rhs_idx]) == const[dot_idx]:
 
                 complete(const[lhs_idx], pos, const[start_idx], const[wt_idx], const)
-            
+
             elif const[rhs_idx][const[dot_idx]] not in NT:
                 if scan(sen, pos, const[rhs_idx][const[dot_idx]]):
                     attach(pos, const[start_idx], const[lhs_idx], const[rhs_idx], const[dot_idx], const[wt_idx], const[ptr_idx])
@@ -148,7 +149,7 @@ def print_parse(ptr):
             str += "( " + p[lhs_idx] + " "
             if print_parse(p[ptr_idx]) == 0:
                 str += ' '.join(p[rhs_idx]) + " )\n"
-          
+
 
 
 gr_file, sen_file = parse_args()
@@ -181,9 +182,3 @@ for s in sen:
         print(best_parse_prob)
 #print(ELY[-1][bparse_idx])
     print("# ",parse_found)
-
-
-
-
-
-
