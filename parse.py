@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import sys
-import nltk
-from collections import defaultdict
-from nltk import word_tokenize
-from math import log
+import copy
+#Optimize time for wallstreet grammar
+#Evaluate on sample grammars and sentences
+#Create a UI for displaying the work
 
 def parse_args():
     if len(sys.argv) < 3:
@@ -14,13 +14,22 @@ def parse_args():
 
 
 def load_grammar(gr_file):
+
+    f = open(gr_file)
     gr = {}
     NT = set()
+
     with open (gr_file) as f:
         for line in f:
-            line = word_tokenize(line.strip())
+            line = (line.strip('\n')).split('\t')
 
-            gr[line[1]] = [[line[2:],log(float(line[0]))]] if line[1] not in gr else gr[line[1]]+[[line[2:],log(float(line[0]))]]
+            rhs = line[2].split(' ')
+            if len(rhs) == 1 and line[1] == rhs[0]:
+                continue
+            elif line[1] not in gr:
+                gr[line[1]] = [[rhs,float(line[0])]]
+            else:
+                gr[line[1]].append([line[2].split(' '),float(line[0])])
 
             NT.update([line[1]])
 
@@ -28,165 +37,142 @@ def load_grammar(gr_file):
 
 
 def load_sentences(sen_file):
+    text = []
     with open (sen_file) as f:
-        text = list(map(lambda t: word_tokenize(t.lstrip()), f))
+        for line in f:
+            line = (line.strip('\n')).split(' ')
+            if line and line[0]!='#':
+                text.append(line)
 
     return text
 
 
-def complete (ELY, idx, lookup_token, lookup_idx, rule_wt):
-    for ely_rule in ELY[lookup_idx]:
-        print("\nComplete Function: rule ", ely_rule, "for lookup ",lookup_token, "at idx ", lookup_idx)
-        remaining_dot = len(ely_rule[0]) - ely_rule[2]
+def complete (ELY, BKTRK, idx, lookup_token, lookup_idx, rule_wt, bktrk_idx):
+    for j, ely_rule in enumerate(ELY[lookup_idx]):
+        remaining_dot = len(ely_rule[0]) - ely_rule[1]
 
-        next_token = ely_rule[0][ely_rule[2]] if remaining_dot > 0 else None
+        next_token = ely_rule[0][ely_rule[1]] if remaining_dot > 0 else None
 
         if next_token == lookup_token:
 
             new_entry = ely_rule.copy()
-            new_entry[2] += 1
-            new_entry[1] += rule_wt
-            if new_entry not in ELY[idx]:
+            new_entry[1] += 1
+
+            bktrk_entry = copy.deepcopy(BKTRK[lookup_idx][j])
+
+            bktrk_entry[0].append((idx,bktrk_idx))
+            bktrk_entry[1] *= rule_wt
+
+            if new_entry not in ELY[idx] or bktrk_entry[1] > BKTRK[idx][ELY[idx].index(new_entry)][1]:
+
                 ELY[idx].append(new_entry)
-    return ELY
+                BKTRK[idx].append(bktrk_entry)
 
 
-def scan (ELY, ely_rule, idx, term, sen):
-    print("\nScan Function: rule ", ely_rule, "for terminal ",term)
+    return ELY, BKTRK
+
+
+def scan (ELY, BKTRK, ely_rule, idx, term, sen):
 
     if idx == len(sen):
-        return ELY
+        return ELY, BKTRK
 
     if sen[idx] == term:
         if len(ELY) == idx + 1:
             ELY.append([])
+            BKTRK.append([])
 
         new_entry = ely_rule.copy()
-        new_entry[2] += 1
+        new_entry[1] += 1
         if new_entry not in ELY[idx+1]:
             ELY[idx+1].append(new_entry)
+            BKTRK[idx+1].append([[],1])
 
-    return ELY
+    return ELY, BKTRK
 
-def predict(ELY, gr, idx, non_term):
+def predict(ELY, BKTRK, gr, idx, non_term):
 
     for rule in gr[non_term]:
-        print("\nPreict Function: rule ", rule, "for nonterminal ",non_term)
-        new_entry = rule+[0,non_term,idx]
+        new_entry = [rule[0]]+[0,non_term,idx]
         if new_entry not in ELY[idx]:
             ELY[idx].append(new_entry)
+            BKTRK[idx].append([[],rule[1]])
 
-    return ELY
+    return ELY, BKTRK
 
 
 def parse(gr, sen):
 
     ELY = [[]]
+    BKTRK = [[]]
 
-    ELY = predict(ELY, gr, 0, 'ROOT')
+    ELY, BKTRK = predict(ELY, BKTRK, gr, 0, 'ROOT')
 
     n = len(sen)
 
     for i in range(n+1):
-        for ely_rule in ELY[i]:
-            print("\nCurrent rule ",ely_rule, "index ", i)
-            remaining_dot = len(ely_rule[0]) - ely_rule[2] #0 idx - RHS of the grammar rule and idx 2 - dot position in ely rule
-            next_token = ely_rule[0][ely_rule[2]] if remaining_dot > 0 else None
-            if next_token in NT and remaining_dot > 0:
-                ELY = predict (ELY, gr, i, ely_rule[0][ely_rule[2]])
+        prev_predicted_NT = []
+        for j, ely_rule in enumerate(ELY[i]):
+            remaining_dot = len(ely_rule[0]) - ely_rule[1] #0 idx - RHS of the grammar rule and idx 2 - dot position in ely rule
+            next_token = ely_rule[0][ely_rule[1]] if remaining_dot > 0 else None
+            if next_token in NT and remaining_dot > 0 and next_token not in prev_predicted_NT:
+                ELY, BKTRK = predict (ELY, BKTRK, gr, i, ely_rule[0][ely_rule[1]])
+                prev_predicted_NT.append(next_token)
 
             if next_token not in NT and remaining_dot > 0:
-                ELY = scan (ELY, ely_rule, i, next_token, sen)
+                ELY, BKTRK = scan (ELY, BKTRK, ely_rule, i, next_token, sen)
 
             if next_token == None:
-                ELY = complete (ELY, i, ely_rule[3], ely_rule[4], ely_rule[1])
-        if i == n:
-            for i in range(n+1):
-                print("\n\n###################### ",i," #############################")
-                print(ELY[i])
-
-    return ELY
+                ELY, BKTRK = complete (ELY, BKTRK, i, ely_rule[2], ely_rule[3], BKTRK[i][j][1], j)
 
 
-def find_best_parse(ELY):
-    completed_tokens = list(filter(lambda t: t[3] == 'ROOT' and t[2] == len(t[0]), ELY[-1]))
-    print("\n",len(completed_tokens), " parses possible.\n")
+    return ELY, BKTRK
+
+
+def find_best_parse(ELY, BKTRK):
+    completed_tokens = list(filter(lambda t: t[2] == 'ROOT' and t[1] == len(t[0]), ELY[-1]))
 
     best_parse_prob = float('-inf')
     for parse in completed_tokens:
-        if parse[1] > best_parse_prob:
-            best_parse_prob = parse[1]
-            best_parse = parse
+        idx = ELY[-1].index(parse)
+        if BKTRK[-1][idx][1] > best_parse_prob:
+            best_parse_prob = BKTRK[-1][idx][1]
+            best_parse_idx = idx
 
-    return best_parse
+    return idx
 
-####
-    global str
-    if ptr == None:
-        return 0
-    else:
-        for p in ptr:
-            #print("(",p[lhs_idx],"(",' '.join(p[rhs_idx]), "(")
-            str += "( " + p[lhs_idx] + " "
-            if print_parse(p[ptr_idx]) == 0:
-                str += ' '.join(p[rhs_idx]) + " )\n"
+def print_parse(ELY, BKTRK, idx):
 
-
-
-def print_parse(ELY, last_rule):
-
-    print("(ROOT ")
-    recurse_print(ELY, last_rule[0])
+    print("( ROOT",end=" ")
+    recurse_print(ELY, BKTRK, -1, idx)
 
     print(")")
 
-def recurse_print(ELY, ptr):
+def recurse_print(ELY, BKTRK, ridx, cidx):
 
-    print("(")
-    for p in ptr:
-        print(p," ")
-        completed_tokens = list(filter(lambda t: t[3] == p and t[2] == len(t[0]), ELY[-1]))
+    print("(",end=" ")
+    ptr = BKTRK[ridx][cidx][0]
+    if not ptr:
+        print(ELY[ridx][cidx][0][0],end=" ")
+    else:
+        for p in ptr:
+            print(ELY[p[0]][p[1]][2],end=" ")
 
-    sys.exit(-1)
+            recurse_print(ELY, BKTRK, *p)
+    print(")",end=" ")
 
 if __name__ == '__main__':
+
     gr_file, sen_file = parse_args()
 
     gr, NT = load_grammar(gr_file)
 
     sen = load_sentences(sen_file)
 
-    print("\n\nGrammar: ",gr)
-
     for s in sen:
 
-        print("\n\nSentence: ",s)
-        ELY = [defaultdict()]
+        ELY, BKTRK = parse(gr, s)
 
-        best_parse_prob = 0
-        parse_found = False
-        str = ""
+        best_parse_idx = find_best_parse(ELY, BKTRK)
 
-        ELY = parse(gr, s)
-
-        best_parse = find_best_parse(ELY)
-
-        print_parse(ELY, best_parse)
-        sys.exit(-1)
-        if parse(gr, s):
-            #for col in range(len(s)+1):
-            #print("#",col,"-",ELY[col])
-            col = len(s)
-            for i in range(len(ELY[col])):
-                if (ELY[col][i][lhs_idx] == 'ROOT') and (ELY[col][i][dot_idx] == len(ELY[col][i][rhs_idx])):
-                    if ELY[col][i][wt_idx] > best_parse_prob:
-
-                        best_parse_prob = ELY[col][i][wt_idx]
-                        bparse_idx = i
-
-            print_parse([ELY[len(s)][bparse_idx]])
-
-            print(str)
-            print(best_parse_prob)
-        #print(ELY[-1][bparse_idx])
-        print("# ",parse_found)
+        print_parse(ELY, BKTRK, best_parse_idx)

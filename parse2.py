@@ -104,11 +104,10 @@ def attach(pos, start, lhs, rhs, dot, wt, ptr):
 def parse(gr, sen):
 
     global parse_found
-
+    
     for r in gr:
-        
         if r[lhs_idx] == 'ROOT':
-            ELY[0] = [[0, 'ROOT', r[rhs_idx], 0, float(r[prob_idx]), None]]
+            ELY[0] = [[0, 'ROOT', r[rhs_idx], 0, int(r[prob_idx]), None]]
     if not ELY[0]:
         return 0
 
