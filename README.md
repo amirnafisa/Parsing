@@ -10,8 +10,7 @@ python3 interface_tool.py
 To use the command line utility:
 python3 parse2.py <grammar file> <Sentence2Parse>
 
-The upper box is the input box
-The lower box is the output box
+![Alt text](./assets/interface.png?raw=true "GUI Interface")
 
 Example Usage:
 python3 parse2.py wallstreet.gr 'The fan is working .'
