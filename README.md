@@ -8,7 +8,7 @@ To use the gui:
 python3 interface_tool.py
 
 To use the command line utility:
-python3 parse2.py <grammar file> <Sentence2Parse>
+python3 parse2.py 'grammar file' 'Sentence2Parse'
 
 ![Alt text](./assets/interface.png?raw=true "GUI Interface")
 
