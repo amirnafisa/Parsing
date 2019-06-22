@@ -100,7 +100,9 @@ class ELYChart:
 
 
     def get_current_token (self):
-        return self._tokens[self._cur_col_idx]
+        if self._cur_col_idx < len(self._tokens):
+            return self._tokens[self._cur_col_idx]
+        return None
 
     def predict(self, token):
         for rule in self._gr.get_rules(token):
@@ -184,12 +186,16 @@ class ELYChart:
                 return ""
             entry = self._nELY[id]
             rhses = entry.get_rule().get_rhs()
-            output_str = '( '
+            output_str = ''
             for rhs, bktrk in zip(rhses, entry.get_bktrack()):
+                if bktrk:
+                    output_str += '('
                 output_str += rhs
                 output_str += ' '
                 output_str += recurse_print(bktrk)
-            output_str += ') '
+                if bktrk:
+                    output_str += ')'
+
             return output_str
 
         iter = self._cur_col.iterate_column(self._cur_col)
@@ -205,10 +211,12 @@ class ELYChart:
         return None
 
 
-def parse_sen(pcfg_gram, sen2parse, result_slot):
+def parse_sen(pcfg_gram, sen2parse, send_end = None):
 
     myELYChart = ELYChart(sen2parse.get_tokens(),pcfg_gram)
     for i in range(len(sen2parse.get_tokens())+1):
+        if myELYChart.get_current_token() not in pcfg_gram.get_terminals():
+            return ''
         myELYChart.set_cur_col_idx(i)
         worker_column = myELYChart.get_column(i)
         prev_predicted_NT = []
@@ -229,12 +237,14 @@ def parse_sen(pcfg_gram, sen2parse, result_slot):
 
 
     output_str = myELYChart.print_parse()
-    result_slot['result'] = output_str
+    if send_end:
+        send_end.send(output_str)
+    return output_str
 
 if __name__ == '__main__':
 
     pcfg_gram = PCFG_Grammar(sys.argv[1])
     sen2parse = Sentence(sys.argv[2])
 
-    parse_sen (pcfg_gram, sen2parse, result_slot = {'result':''})
-    print(result_slot['result'])
+    output_str = parse_sen (pcfg_gram, sen2parse)
+    print(output_str)
