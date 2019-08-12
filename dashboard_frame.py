@@ -6,6 +6,11 @@ class ATIDashboard:
         self.frame = Frame(master, relief=relief, style=style_frame())
         self.frame.pack(side='top',fill='both', expand=expand)
 
+class ATIHorizontalGrid:
+    def __init__ (self, master, expand=False, relief="flat"):
+        self.frame = Frame(master, relief=relief, style=style_frame())
+        self.frame.pack(side='left',fill='both',expand=expand)
+
 class ATILabel:
     def __init__ (self, master, text=''):
         self.lbl = Label(master, text=text, background='antique white')
@@ -55,11 +60,11 @@ class ATILog:
         if disable:
             self.log.config(state="disabled")
 
-    def add_text(self, text, disable=False):
+    def add_text(self, text, disable=False, align="center"):
         if disable:
             self.log.config(state="normal")
         self.log.tag_configure("center", justify='center')
         self.log.insert("end", text)
-        self.log.tag_add("center", "1.0", "end")
+        self.log.tag_add(align, "1.0", "end")
         if disable:
             self.log.config(state="disabled")

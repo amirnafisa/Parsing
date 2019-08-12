@@ -1,5 +1,4 @@
-import sys
-
+from math import log
 class PCFG_Rule:
     def __init__ (self, rule_string):
         sub_parts = rule_string.split('\t')
@@ -9,7 +8,7 @@ class PCFG_Rule:
 
         self._lhs = sub_parts[1]
         self._rhs = sub_parts[2].split(' ')
-        self._prob = float(sub_parts[0])
+        self._score = -log(float(sub_parts[0]))
 
     def get_lhs(self):
         return self._lhs
@@ -17,11 +16,14 @@ class PCFG_Rule:
     def get_rhs(self):
         return self._rhs
 
-    def get_prob(self):
-        return self._prob
+    def get_score(self):
+        return self._score
 
     def print_rule(self):
-        print("Rule: ",self._lhs," => ",','.join(self._rhs)," [",self._prob,"]",sep='')
+        print("Rule: ",self._lhs," => ",','.join(self._rhs)," [",self._score,"]",sep='')
+
+    def get_rule_str(self):
+        return self._lhs + " -> " + ', '.join(self._rhs) + " [" + str(self._score) + "]\n"
 
 class PCFG_Grammar:
     def __init__ (self, grammar_file):
@@ -49,6 +51,28 @@ class PCFG_Grammar:
 
     def get_terminals(self):
         return self._T
+
+    def remove_terminals(self, terminals):
+        for terminal in terminals:
+            self._T.remove(terminal)
+
+        respective_NTs = []
+        remove_nonterminals = []
+        for non_terminal, rules in self._gr.items():
+
+            rules_to_remove = []
+            for rule in rules:
+                rhs = rule.get_rhs()
+                if len(set(rhs) - terminals) < len(set(rhs)):
+                    rules_to_remove.append(rule)
+            for rule in rules_to_remove:
+                self._gr[non_terminal].remove(rule)
+            if not self._gr[non_terminal]:
+                self._NT.remove(non_terminal)
+                remove_nonterminals.append(non_terminal)
+
+        for nt in remove_nonterminals:
+            del self._gr[nt]
 
     def get_rules(self, non_terminal):
         if non_terminal in self._NT:

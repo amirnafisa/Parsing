@@ -19,14 +19,16 @@ class App:
             'parsing': False
         }
 
-        self.main_frame = ATIDashboard(master, expand=True, relief="sunken")
+        self.main_frame = ATIHorizontalGrid(master, expand=True, relief="sunken")
+        self.gr_frame = ATIHorizontalGrid(master, expand=True, relief="sunken")
+
         self.input_frame = ATIDashboard(self.main_frame.frame, expand=True)
         self.input_label = ATILabel(self.input_frame.frame, text='Input Goes Here')
         self.output_frame = ATIDashboard(self.main_frame.frame, expand=True)
         self.output_label = ATILabel(self.output_frame.frame, text='Output Appears Here')
         self.menu_frame = ATIDashboard(self.main_frame.frame, relief="sunken")
 
-        self.log = ATIEntry(self.input_frame.frame)
+        self.log = ATILog(self.input_frame.frame, scrollbar=True)
         self.output_log = ATILog(self.output_frame.frame, scrollbar=True)
         self.output_log.log.config(state="disabled")
 
@@ -34,7 +36,15 @@ class App:
 
         self.progressbar = Progressbar(mode="determinate", orient="horizontal", length=200)
 
-        self.gr = PCFG_Grammar('./wallstreet.gr')
+        self.gr_label = ATILabel(self.gr_frame.frame, text='PCFG Grammar Rules')
+        self.gr_log = ATILog(self.gr_frame.frame, scrollbar=True)
+
+        self.gr = PCFG_Grammar('./test.gr')
+
+        for nt in self.gr.get_non_terminals():
+            for rule in self.gr.get_rules(nt):
+                self.gr_log.add_text(rule.get_rule_str(), align='left')
+
 
     def set_app_title(self, master, title):
         top_level = master.winfo_toplevel()
@@ -56,10 +66,10 @@ class App:
         sen = Sentence(self.log.retrieve_text())
 
         self.recv_end, send_end = multiprocessing.Pipe(False)
-        self.process = multiprocessing.Process(target=parse_sen, args=(self.gr, sen, send_end))
+        self.process = multiprocessing.Process(target=parse_sen, args=(self.gr, sen, send_end, True))
 
         self.progressbar.pack()
-        self.log.entry.config(state="disabled")
+        self.log.log.config(state="disabled")
         self.root.config(cursor="wait")
         self.root.update()
 
@@ -76,13 +86,13 @@ class App:
 
             self.progressbar.stop()
             self.progressbar.pack_forget()
-            self.log.entry.config(state="normal")
+            self.log.log.config(state="normal")
             try:
                 output_str = self.recv_end.recv()
             except EOFError:
                 output_str = ''
 
-            if not output_str == '':
+            if not output_str == '' and output_str is not None:
                 self.output_log.add_text(TreePrettyPrinter(Tree.fromstring(output_str)), disable=True)
 
             self.root.config(cursor="")
